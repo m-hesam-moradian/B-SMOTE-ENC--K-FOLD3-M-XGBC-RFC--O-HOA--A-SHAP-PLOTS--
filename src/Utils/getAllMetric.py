@@ -42,7 +42,9 @@ def find_zero(arr):
 
 
 # Data Loading
-data = np.loadtxt("D:/ML/Data_err.npt")
+data = np.loadtxt(
+    r"D:\ML\B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])\src\Utils\Data_err.npt"
+)
 
 y = data[:, 0]
 predictData = data[:, 1]
@@ -578,7 +580,10 @@ def getAllMetric(measured, predicted):
     MARE = S14 / N  # Mean Absolute Relative Error(Mean Magnitude Relative Error – MMRE)
     RAE = S15  # Relative Absolute Error
     MRAE = S15 / N  # Mean Relative Absolute Error
-    PI = (1 / np.mean(measured)) * (RMSE / (np.sqrt(R) + 1))
+    R_safe = np.where(
+        R < 0, 0, R
+    )  # Replace negatives with 0 or a small epsilon if needed
+    PI = (1 / np.mean(measured)) * (RMSE / (np.sqrt(R_safe) + 1))
 
     IOA = 1 - (S16 / S17)
 

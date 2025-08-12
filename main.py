@@ -2,124 +2,130 @@ import os
 import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
+
+# Import custom modules
 from src.Utils.K_Fold import K_Fold
 from src.data_loader import load_data
-from src.analysis.SHAP import shap_analysis
-from sklearn.ensemble import AdaBoostRegressor
-from src.feature_engineering import average_daily
-from objective_function import objective_adaboost
-from Utils.balance_dataset_smote_enc import balance_dataset_smote_enc
 from src.model.train_model import get_X_y, train_model
+from src.analysis.SHAP import shap_analysis
 from src.analysis.LIME import lime_sensitivity_analysis
 from src.Optimiser.HOA.hoa_optimizer import hoa_optimizer
+from src.Utils.balance_dataset_smote_enc import balance_with_smote_enc
+from objective_function import objective_stacking
 
+# =======================
+# 📌 Configuration
+# =======================
+DATA_PATH = (
+    r"D:\ML\B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])\data\data.xlsx"
+)
+RAW_CSV_PATH = r"D:\ML\B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])\data\Dataset-10MO-Yahyavi (Student Stress Level).csv"
+TARGET_COLUMN = "Stress Level "
+CATEGORICAL_FEATURES = ["Gender"]
 
-DATA_PATH = "D:\ML\B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])\data\Dataset-10MO-Yahyavi (Student Stress Level).csv"
-df = load_data(DATA_PATH)
-# Load your data (make sure to implement or import load_data function)
+# =======================
+# 📥 Data Loading & Balancing
+# =======================
 
-target_column = "Stress Level"
-categorical_features = [1]  # 'Gender' column index in feature set
+# Load raw data from Excel
+raw_data = load_data(DATA_PATH)
 
-balanced_df = balance_dataset_smote_enc(df, target_column, categorical_features)
+# Balance dataset using SMOTE-ENC
+balanced_df = balance_with_smote_enc(
+    file_path=RAW_CSV_PATH,
+    target_col=TARGET_COLUMN,
+    categorical_cols=CATEGORICAL_FEATURES,
+)
 
-# Now balanced_df contains your oversampled balanced dataset
-print(
-    balanced_df[target_column].value_counts()
-)  # Check class distribution after balancing
+# Encode 'Gender' column
+balanced_df["Gender"] = balanced_df["Gender"].map({"Male": 0, "Female": 1, "Other": 2})
 
-# Display original and cleaned DataFrame
+# Round numerical values
+balanced_df = balanced_df.round(1)
+
+# Save balanced data to Excel (overwrite existing sheet if needed)
 book = load_workbook(DATA_PATH)
-if "Data after Z-score" in book.sheetnames:
-    book.remove(book["Data after Z-score"])
+if "Data after SMOTE-ENC" in book.sheetnames:
+    book.remove(book["Data after SMOTE-ENC"])
     book.save(DATA_PATH)
+
 with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
     balanced_df.to_excel(writer, sheet_name="Data after SMOTE-ENC", index=False)
 
-X, y = get_X_y(balanced_df, target_col="Burned Calories ")
+# =======================
+# ✂️ Feature Extraction
+# =======================
+X, y = get_X_y(balanced_df, target_col=TARGET_COLUMN)
 
+# =======================
+# 🔁 K-Fold Cross-Validation
+# =======================
+X_train, X_test, y_train, y_test, kfold_scores, combined_df = K_Fold(X, y, n_splits=5)
+kfold_scores_df = pd.DataFrame(kfold_scores)
 
-# # Apply K-Fold cross-validation
-# (
-#     X_train_best,
-#     X_test_best,
-#     y_train_best,
-#     y_test_best,
-#     K_Fold_Cross_Validation_Scores,
-#     combined_df,
-# ) = K_Fold(X, y, n_splits=5)
+# Save combined K-Fold dataset to Excel
+book = load_workbook(DATA_PATH)
+if "DATA after K-Fold" in book.sheetnames:
+    book.remove(book["DATA after K-Fold"])
+    book.save(DATA_PATH)
 
-# K_Fold_Cross_Validation_Scores = pd.DataFrame(K_Fold_Cross_Validation_Scores)
+with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
+    combined_df.to_excel(writer, sheet_name="DATA after K-Fold", index=False)
 
-# # Save combined K-Fold data to Excel
-# # book = load_workbook(DATA_PATH)
-# # if "DATA after K-Fold" in book.sheetnames:
-# #     book.remove(book["DATA after K-Fold"])
-# #     book.save(DATA_PATH)
-# # with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
-# #     combined_df.to_excel(writer, sheet_name="DATA after K-Fold", index=False)
+# =======================
+# ⚙️ Baseline Model Training (Without Optimization)
+# =======================
+baseline_result = train_model(X_train, y_train, X_test, y_test)
 
+# =======================
+# 🚀 Run HOA Optimizer on Objective Function
+# =======================
+best_params, best_rmse, convergence = hoa_optimizer(
+    objective_function=objective_stacking,
+    lb=[50, 0.01],  # Lower bounds for [n_estimators, learning_rate]
+    ub=[300, 1.0],  # Upper bounds
+    dim=2,  # Number of parameters
+    n_agents=1,  # Number of agents (keep low for testing)
+    max_iter=3,  # Number of iterations (increase for better optimization)
+    X_train=X_train,
+    y_train=y_train,
+    X_test=X_test,
+    y_test=y_test,
+)
 
-# # # Helper function to average metrics
-# # def summarize_metrics(metrics_list):
-# #     return {key: np.mean([m[key] for m in metrics_list]) for key in metrics_list[0]}
+# =======================
+# 🤖 Retrain Model with Optimized Parameters
+# =======================
+hoa_result = train_model(X_train, y_train, X_test, y_test, params=best_params)
 
+# =======================
+# 📊 SHAP Analysis
+# =======================
+shap_df, shap_values = shap_analysis(
+    model=hoa_result["model"],
+    X_train=X_train,
+    y_train=y_train,
+    X_test=X_test,
+    y_test=y_test,
+    save_path=DATA_PATH,
+    sheet_name="SHAP_Sensitivity",
+)
 
-# # avg_metrics_k_fold = summarize_metrics(K_Fold_Cross_Validation_Scores)
-# # print("Average Metrics:")
-# # for key, value in avg_metrics_k_fold.items():
-# #     print(f"{key}: {value:.4f}")
+# =======================
+# 🧪 LIME Sensitivity Analysis
+# =======================
+lime_result = lime_sensitivity_analysis(
+    model=hoa_result["model"],
+    X_train=X_train,
+    y_train=y_train,
+    X_test=X_test,
+    y_test=y_test,
+    sample_index=5,
+    epsilon=0.05,
+)
 
-
-# # singleModel_result = train_model(X_train_best, y_train_best, X_test_best, y_test_best)
-
-
-# # best_pos, best_RMSE, convergence = hoa_optimizer(
-# #     objective_adaboost,  # our AdaBoost objective
-# #     [500, 0.01],  # lower bounds: n_estimators, learning_rate
-# #     [1000, 1.0],  # upper bounds
-# #     2,  # dim
-# #     5,  # n_agents
-# #     5,  # max_iter
-# #     X_train_best,
-# #     y_train_best,
-# #     X_test_best,
-# #     y_test_best,
-# # )
-
-# # HOA_model_result = train_model(
-# #     X_train_best, y_train_best, X_test_best, y_test_best, best_pos
-# # )
-
-# model = AdaBoostRegressor()
-# model.fit(X_train_best, y_train_best)
-
-# # # SHAP on the HOA model
-# # sensitivity_df_shap, shap_values = shap_analysis(
-# #     model=model,
-# #     X_train=X_train_best,
-# #     y_train=y_train_best,
-# #     X_test=X_test_best,
-# #     y_test=y_test_best,
-# #     save_path=DATA_PATH,  # save to same Excel file
-# #     sheet_name="SHAP_Sensitivity",
-# # )
-
-
-# sensitivity_LIME = pd.DataFrame(
-#     [
-#         lime_sensitivity_analysis(
-#             model=model,
-#             X_train=X_train_best,
-#             y_train=y_train_best,
-#             X_test=X_test_best,
-#             y_test=y_test_best,
-#             sample_index=5,
-#             epsilon=0.05,
-#         )
-#     ]
-# )
-
-
-# # print("\nBest AdaBoost Params:", best_pos)
-# # print("Best RMSE:", best_RMSE)
+# =======================
+# 📤 Final Output
+# =======================
+print("\n✅ Best Hyperparameters (from HOA):", best_params)
+print("📉 Best RMSE:", best_rmse)

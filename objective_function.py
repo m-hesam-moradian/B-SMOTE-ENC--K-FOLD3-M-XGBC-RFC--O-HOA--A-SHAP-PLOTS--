@@ -1,28 +1,22 @@
-from sklearn.ensemble import AdaBoostRegressor
-from sklearn.metrics import mean_absolute_error
+from src.model.train_model import train_model
 
 
-def objective_adaboost(params, X_train, y_train, X_test, y_test):
+def objective_stacking(params, X_train, y_train, X_test, y_test):
     """
-    Objective function for AdaBoostRegressor optimization.
+    Objective function for optimizing StackingClassifier(XGB + RF) using your train_model.
 
     Parameters:
         params[0] -> n_estimators (int)
         params[1] -> learning_rate (float)
     """
-    # Extract and convert parameters
-    n_estimators = int(params[0])
-    learning_rate = float(params[1])
 
-    # Define model
-    model = AdaBoostRegressor(
-        n_estimators=n_estimators, learning_rate=learning_rate, random_state=42
-    )
+    # Train the model using your existing function
+    result = train_model(X_train, y_train, X_test, y_test, params=params)
 
-    # Train and predict
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    # Choose a metric to optimize — e.g., 'accuracy', 'f1', 'rmse', etc.
+    # Let's assume you want to minimize RMSE from test set:
+    rmse = result["metrics"]["test"]["RMSE"].values[
+        0
+    ]  # make sure 'rmse' exists in your getAllMetric
 
-    # Calculate MAE
-    mae = mean_absolute_error(y_test, y_pred)
-    return mae
+    return rmse  # This scalar value will be minimized by HOA optimizer

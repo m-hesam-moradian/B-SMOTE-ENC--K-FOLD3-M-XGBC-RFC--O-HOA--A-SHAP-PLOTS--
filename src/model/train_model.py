@@ -1,86 +1,85 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from xgboost import XGBClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from src.Utils.getAllMetric import getAllMetric
-from xgboost import XGBClassifier
+from sklearn.ensemble import StackingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 
 def train_model(X_train, y_train, X_test, y_test, params=None):
-    # Default parameters for base models
+    # Model selection (same as your current setup)
+
     default_params = {
         "n_estimators": 50,
         "learning_rate": 0.5,
-        "random_state": 42,
-        "loss": "square",  # Not used in classifiers, but kept for compatibility
+        "loss": "square",
     }
 
-    # Override parameters if provided
     final_params = (
         default_params
         if params is None
         else {
             "n_estimators": int(params[0]),
             "learning_rate": float(params[1]),
-            "random_state": 42,
+            "loss": "linear",
         }
     )
-
-    # Define base models
     xgb_model = XGBClassifier(
         n_estimators=final_params["n_estimators"],
         learning_rate=final_params["learning_rate"],
-        random_state=final_params["random_state"],
-        use_label_encoder=False,
-        eval_metric="logloss",
+        enable_categorical=True,
     )
 
     rf_model = RandomForestClassifier(
         n_estimators=final_params["n_estimators"],
-        random_state=final_params["random_state"],
     )
 
     # Define stacking classifier
     model = StackingClassifier(
         estimators=[("xgb", xgb_model), ("rf", rf_model)],
-        final_estimator=LogisticRegression(),
+        final_estimator=LogisticRegression(max_iter=2000),  # was default 100
         passthrough=True,
     )
 
+    # Fit the model
     model_name = "StackingClassifier(XGB + RF)"
 
-    # Fit the model
-    y_train = np.asarray(y_train)
-    y_test = np.asarray(y_test)
-    model.fit(X_train, y_train)
+    np.asarray(y_train)
 
+    np.asarray(y_train)
+    np.asarray(y_test)
+    model.fit(X_train, y_train)
     # Predictions
+
     y_pred_train = model.predict(X_train)
+    midpoint = len(y_test) // 2
     y_pred_test = model.predict(X_test)
 
-    midpoint = len(y_test) // 2
     X_value, X_value_test = X_test[:midpoint], X_test[midpoint:]
     y_value, y_value_test = y_test[:midpoint], y_test[midpoint:]
 
     y_pred_value = model.predict(X_value)
     y_pred_value_test = model.predict(X_value_test)
 
-    # Evaluate
-    metrics_train = pd.DataFrame([getAllMetric(y_train, y_pred_train)])
-    metrics_test = pd.DataFrame([getAllMetric(y_test, y_pred_test)])
-    metrics_value = pd.DataFrame([getAllMetric(y_value, y_pred_value)])
-    metrics_value_test = pd.DataFrame([getAllMetric(y_value_test, y_pred_value_test)])
+    metrics_train = pd.DataFrame([getAllMetric(y_train.to_numpy(), y_pred_train)])
+    metrics_test = pd.DataFrame([getAllMetric(y_test.to_numpy(), y_pred_test)])
+    metrics_value = pd.DataFrame([getAllMetric(y_value.to_numpy(), y_pred_value)])
 
+    metrics_value_test = pd.DataFrame(
+        [getAllMetric(y_value_test.to_numpy(), y_pred_value_test)]
+    )
+
+    # For concatenated all predictions
     metrics_all = pd.DataFrame(
         [
             getAllMetric(
-                np.concatenate([y_train, y_test]),
+                np.concatenate([y_train.to_numpy(), y_test.to_numpy()]),
                 np.concatenate([y_pred_train, y_pred_test]),
             )
         ]
     )
 
+    # Bundle all metrics
     all_metrics = {
         "all": metrics_all,
         "train": metrics_train,
@@ -91,8 +90,9 @@ def train_model(X_train, y_train, X_test, y_test, params=None):
 
     return {
         "model_name": model_name,
+        # if there is no params, dont return model
         "model": model,
-        "best_params": pd.DataFrame([final_params]),
+        # "best_params": pd.DataFrame([final_params]),
         "metrics": all_metrics,
         "y_pred_train": y_pred_train,
         "y_pred_test": y_pred_test,
@@ -122,9 +122,9 @@ def get_X_y(df, target_col):
 #         )
 
 #     if rf_params is None:
-#         rf = RandomForestClassifier(random_state=42)
+#         rf = RandomForestClassifierRegressor(random_state=42)
 #     else:
-#         rf = RandomForestClassifier(
+#         rf = RandomForestClassifierRegressor(
 #             n_estimators=int(rf_params[0]),
 #             max_depth=int(rf_params[1]),
 #             min_samples_split=int(rf_params[2]),

@@ -47,7 +47,4 @@ def balance_with_smote_enc(file_path, target_col, categorical_cols, output_path=
     if output_path:
         balanced_df.to_csv(output_path, index=False)
 
-    print("Before balancing:\n", y.value_counts())
-    print("\nAfter balancing:\n", y_resampled.value_counts())
-
     return balanced_df
