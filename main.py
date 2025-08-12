@@ -43,14 +43,14 @@ balanced_df["Gender"] = balanced_df["Gender"].map({"Male": 0, "Female": 1, "Othe
 # Round numerical values
 balanced_df = balanced_df.round(1)
 
-# Save balanced data to Excel (overwrite existing sheet if needed)
-book = load_workbook(DATA_PATH)
-if "Data after SMOTE-ENC" in book.sheetnames:
-    book.remove(book["Data after SMOTE-ENC"])
-    book.save(DATA_PATH)
+# # Save balanced data to Excel (overwrite existing sheet if needed)
+# book = load_workbook(DATA_PATH)
+# if "Data after SMOTE-ENC" in book.sheetnames:
+#     book.remove(book["Data after SMOTE-ENC"])
+#     book.save(DATA_PATH)
 
-with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
-    balanced_df.to_excel(writer, sheet_name="Data after SMOTE-ENC", index=False)
+# with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
+#     balanced_df.to_excel(writer, sheet_name="Data after SMOTE-ENC", index=False)
 
 # =======================
 # ✂️ Feature Extraction
@@ -63,69 +63,70 @@ X, y = get_X_y(balanced_df, target_col=TARGET_COLUMN)
 X_train, X_test, y_train, y_test, kfold_scores, combined_df = K_Fold(X, y, n_splits=5)
 kfold_scores_df = pd.DataFrame(kfold_scores)
 
-# Save combined K-Fold dataset to Excel
-book = load_workbook(DATA_PATH)
-if "DATA after K-Fold" in book.sheetnames:
-    book.remove(book["DATA after K-Fold"])
-    book.save(DATA_PATH)
+# # Save combined K-Fold dataset to Excel
+# book = load_workbook(DATA_PATH)
+# if "DATA after K-Fold" in book.sheetnames:
+#     book.remove(book["DATA after K-Fold"])
+#     book.save(DATA_PATH)
 
-with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
-    combined_df.to_excel(writer, sheet_name="DATA after K-Fold", index=False)
+# with pd.ExcelWriter(DATA_PATH, engine="openpyxl", mode="a") as writer:
+#     combined_df.to_excel(writer, sheet_name="DATA after K-Fold", index=False)
 
 # =======================
 # ⚙️ Baseline Model Training (Without Optimization)
 # =======================
 baseline_result = train_model(X_train, y_train, X_test, y_test)
 
-# =======================
-# 🚀 Run HOA Optimizer on Objective Function
-# =======================
-best_params, best_rmse, convergence = hoa_optimizer(
-    objective_function=objective_stacking,
-    lb=[50, 0.01],  # Lower bounds for [n_estimators, learning_rate]
-    ub=[300, 1.0],  # Upper bounds
-    dim=2,  # Number of parameters
-    n_agents=1,  # Number of agents (keep low for testing)
-    max_iter=3,  # Number of iterations (increase for better optimization)
-    X_train=X_train,
-    y_train=y_train,
-    X_test=X_test,
-    y_test=y_test,
-)
 
-# =======================
-# 🤖 Retrain Model with Optimized Parameters
-# =======================
-hoa_result = train_model(X_train, y_train, X_test, y_test, params=best_params)
+# # =======================
+# # 🚀 Run HOA Optimizer on Objective Function
+# # =======================
+# best_params, best_rmse, convergence = hoa_optimizer(
+#     objective_function=objective_stacking,
+#     lb=[50, 0.01],  # Lower bounds for [n_estimators, learning_rate]
+#     ub=[300, 1.0],  # Upper bounds
+#     dim=2,  # Number of parameters
+#     n_agents=4,  # Number of agents (keep low for testing)
+#     max_iter=10,  # Number of iterations (increase for better optimization)
+#     X_train=X_train,
+#     y_train=y_train,
+#     X_test=X_test,
+#     y_test=y_test,
+# )
 
-# =======================
-# 📊 SHAP Analysis
-# =======================
-shap_df, shap_values = shap_analysis(
-    model=hoa_result["model"],
-    X_train=X_train,
-    y_train=y_train,
-    X_test=X_test,
-    y_test=y_test,
-    save_path=DATA_PATH,
-    sheet_name="SHAP_Sensitivity",
-)
+# # =======================
+# # 🤖 Retrain Model with Optimized Parameters
+# # =======================
+# hoa_result = train_model(X_train, y_train, X_test, y_test, params=best_params)
 
-# =======================
-# 🧪 LIME Sensitivity Analysis
-# =======================
-lime_result = lime_sensitivity_analysis(
-    model=hoa_result["model"],
-    X_train=X_train,
-    y_train=y_train,
-    X_test=X_test,
-    y_test=y_test,
-    sample_index=5,
-    epsilon=0.05,
-)
+# # =======================
+# # 📊 SHAP Analysis
+# # =======================
+# shap_df, shap_values = shap_analysis(
+#     model=hoa_result["model"],
+#     X_train=X_train,
+#     y_train=y_train,
+#     X_test=X_test,
+#     y_test=y_test,
+#     save_path=DATA_PATH,
+#     sheet_name="SHAP_Sensitivity",
+# )
 
-# =======================
-# 📤 Final Output
-# =======================
-print("\n✅ Best Hyperparameters (from HOA):", best_params)
-print("📉 Best RMSE:", best_rmse)
+# # =======================
+# # 🧪 LIME Sensitivity Analysis
+# # =======================
+# lime_result = lime_sensitivity_analysis(
+#     model=hoa_result["model"],
+#     X_train=X_train,
+#     y_train=y_train,
+#     X_test=X_test,
+#     y_test=y_test,
+#     sample_index=5,
+#     epsilon=0.05,
+# )
+
+# # =======================
+# # 📤 Final Output
+# # =======================
+# print("\n✅ Best Hyperparameters (from HOA):", best_params)
+# print("📉 Best RMSE:", best_rmse)

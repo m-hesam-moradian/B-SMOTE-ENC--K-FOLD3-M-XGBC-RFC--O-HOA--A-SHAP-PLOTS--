@@ -12,7 +12,6 @@ def train_model(X_train, y_train, X_test, y_test, params=None):
     default_params = {
         "n_estimators": 50,
         "learning_rate": 0.5,
-        "loss": "square",
     }
 
     final_params = (
@@ -87,16 +86,18 @@ def train_model(X_train, y_train, X_test, y_test, params=None):
         "value": metrics_value,
         "test_value": metrics_value_test,
     }
-
-    return {
+    print(metrics_train["R2"])
+    result = {
         "model_name": model_name,
         # if there is no params, dont return model
-        "model": model,
-        # "best_params": pd.DataFrame([final_params]),
         "metrics": all_metrics,
         "y_pred_train": y_pred_train,
         "y_pred_test": y_pred_test,
     }
+    if params is not None:
+        result["model"] = model
+
+    return result
 
 
 def get_X_y(df, target_col):
