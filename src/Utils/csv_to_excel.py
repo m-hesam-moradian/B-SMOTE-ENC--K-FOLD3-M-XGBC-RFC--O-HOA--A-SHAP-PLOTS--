@@ -2,8 +2,10 @@ import pandas as pd
 from openpyxl import load_workbook
 
 # ✅ Use raw strings to fix escape issues
-csv_path = r"D:\ML\Hesam= SCI-6MO-Yahyavi-Deadline=8-7-2025\data\Dataset-6MO-Daily Activity.csv"
-excel_path = r"D:\ML\Hesam= SCI-6MO-Yahyavi-Deadline=8-7-2025\data\data.xlsx"
+csv_path = r"D:\ML\B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])\data\Dataset-10MO-Yahyavi (Student Stress Level).csv"
+excel_path = (
+    r"D:/ML/B(SMOTE-ENC)#K-FOLD3#M(XGBC&RFC)#O(HOA)#A(SHAP[PLOTS])/data/data.xlsx"
+)
 
 # Step 1: Load CSV file into a DataFrame
 df = pd.read_csv(csv_path)
